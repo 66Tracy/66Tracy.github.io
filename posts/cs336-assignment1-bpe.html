@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stanford CS336 (1) Assignment 1 — Byte Pair Encoding | Chen Xi</title>
+    <style>
+        :root {
+            --primary-blue: #003366;
+            --light-blue: #e7f3ff;
+            --text-color: #333;
+            --bg-color: #fff;
+            --border-color: #eee;
+        }
+
+        body {
+            font-family: "Charter", "Georgia", "Times New Roman", serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            background-color: var(--bg-color);
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        nav {
+            border-bottom: 2px solid var(--primary-blue);
+            margin-bottom: 40px;
+            padding-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .nav-links a {
+            text-decoration: none;
+            color: var(--primary-blue);
+            margin-left: 25px;
+            font-weight: bold;
+        }
+
+        .nav-links a:hover {
+            text-decoration: underline;
+        }
+
+        .logo {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: var(--primary-blue);
+        }
+
+        .logo a {
+            text-decoration: none;
+            color: var(--primary-blue);
+        }
+
+        .post-header {
+            margin-bottom: 30px;
+        }
+
+        .post-header h1 {
+            color: var(--primary-blue);
+            margin: 0 0 10px 0;
+        }
+
+        .post-date {
+            color: #888;
+            font-size: 0.9em;
+        }
+
+        .post-content {
+            margin-top: 30px;
+        }
+
+        .post-content h2 {
+            color: var(--primary-blue);
+            margin-top: 30px;
+        }
+
+        .post-content p {
+            margin: 15px 0;
+        }
+
+        .placeholder {
+            background-color: var(--light-blue);
+            border-left: 4px solid var(--primary-blue);
+            padding: 20px;
+            margin: 20px 0;
+            color: #666;
+        }
+
+        code {
+            background-color: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: "Consolas", "Monaco", monospace;
+            font-size: 0.9em;
+        }
+
+        pre {
+            background-color: #f4f4f4;
+            padding: 15px;
+            overflow-x: auto;
+            border-radius: 5px;
+        }
+
+        pre code {
+            background: none;
+            padding: 0;
+        }
+    </style>
+</head>
+<body>
+
+    <nav>
+        <div class="logo"><a href="../index.html">Chen Xi</a></div>
+        <div class="nav-links">
+            <a href="../index.html">返回首页</a>
+        </div>
+    </nav>
+
+    <article>
+        <div class="post-header">
+            <h1>Stanford CS336 (1) Assignment 1 — Byte Pair Encoding</h1>
+            <div class="post-date">2026年5月13日</div>
+        </div>
+
+        <div class="post-content">
+            <div class="placeholder">
+                <p><strong>[占位内容]</strong> 这篇笔记正在撰写中，敬请期待...</p>
+            </div>
+
+            <h2>背景</h2>
+            <p>
+                <a href="https://stanford-cs336.github.io/spring2025/" target="_blank">Stanford CS336</a> 是 Stanford 开设的一门关于大语言模型（LLM）的课程，涵盖了从预训练到后训练的完整 pipeline。这是该课程的第一个 assignment，目标是实现一个 Byte Pair Encoding (BPE) 分词器。
+            </p>
+
+            <h2>Byte Pair Encoding 简介</h2>
+            <p>
+                BPE 是一种常见的子词（subword）分词算法，广泛应用于现代 NLP 系统中。其核心思想是从字符级别开始，迭代地将语料中最频繁相邻的 token 对合并成新的 token，直到达到预定的词汇表大小。
+            </p>
+
+            <h2>实现要点</h2>
+            <p>
+                [待补充：具体的实现细节与代码解析]
+            </p>
+
+            <h2>总结</h2>
+            <p>
+                [待补充：总结与思考]
+            </p>
+        </div>
+    </article>
+
+</body>
+</html>
