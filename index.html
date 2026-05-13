@@ -1,6 +1,169 @@
-<html>
-  <body>
-    <h1>Chen Xi 的个人空间</h1>
-    <p>专注 Agent 架构与 Lean 4 形式化验证。</p>
-  </body>
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chen Xi | 个人主页</title>
+    <style>
+        /* 全局样式 - 蓝白学术风格 */
+        :root {
+            --primary-blue: #003366; /* 深学术蓝 */
+            --light-blue: #e7f3ff;
+            --text-color: #333;
+            --bg-color: #fff;
+            --border-color: #eee;
+        }
+
+        body {
+            font-family: "Charter", "Georgia", "Times New Roman", serif; /* 衬线字体更有学术感 */
+            line-height: 1.6;
+            color: var(--text-color);
+            background-color: var(--bg-color);
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        /* 导航栏 */
+        nav {
+            border-bottom: 2px solid var(--primary-blue);
+            margin-bottom: 40px;
+            padding-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .nav-links a {
+            text-decoration: none;
+            color: var(--primary-blue);
+            margin-left: 25px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .nav-links a:hover {
+            text-decoration: underline;
+        }
+
+        .logo {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: var(--primary-blue);
+        }
+
+        /* 内容区域 */
+        section {
+            display: none; /* 默认隐藏所有部分 */
+        }
+
+        section.active {
+            display: block; /* 只显示当前激活的部分 */
+        }
+
+        /* 个人介绍样式 */
+        .profile-header {
+            display: flex;
+            align-items: center;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .profile-info h1 {
+            margin: 0;
+            color: var(--primary-blue);
+        }
+
+        /* 博客列表样式 */
+        .post-preview {
+            padding: 20px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .post-preview h3 {
+            margin: 0 0 10px 0;
+        }
+
+        .post-preview a {
+            text-decoration: none;
+            color: var(--primary-blue);
+        }
+
+        .post-preview a:hover {
+            color: #0056b3;
+        }
+
+        .post-date {
+            font-size: 0.9em;
+            color: #888;
+            margin-bottom: 8px;
+        }
+
+        .post-excerpt {
+            font-size: 1em;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+
+    <nav>
+        <div class="logo">Chen Xi</div>
+        <div class="nav-links">
+            <a onclick="showSection('about')">个人介绍</a>
+            <a onclick="showSection('blog')">博客</a>
+        </div>
+    </nav>
+
+    <section id="about" class="active">
+        <div class="profile-header">
+            <div class="profile-info">
+                <h1>陈曦</h1>
+                <p><strong>智能体工程师 | 形式化验证研究者</strong></p>
+                <p>毕业于南洋理工大学 (NTU, 2024)。专注于 AI Agent 架构开发以及 Lean 4 形式化验证。热衷于探索数学逻辑与自动化系统的交集。</p>
+            </div>
+        </div>
+        <h3>研究兴趣</h3>
+        <ul>
+            <li>Model Context Protocol (MCP) 与 Agent 运行时</li>
+            <li>Lean 4 形式化证明与 Mathlib 4</li>
+            <li>容器化沙箱调度系统</li>
+        </ul>
+    </section>
+
+    <section id="blog">
+        <h2 style="color: var(--primary-blue);">近期随笔</h2>
+        
+        <div class="post-preview">
+            <div class="post-date">2026年4月15日</div>
+            <h3><a href="#">Lean 4 形式化证明初探：从 AIME 题目谈起</a></h3>
+            <p class="post-excerpt">记录了将 Omni-Math 问题转化为 Lean 4 语句的过程，以及在处理复杂拓扑依赖时遇到的坑...</p>
+        </div>
+
+        <div class="post-preview">
+            <div class="post-date">2026年3月28日</div>
+            <h3><a href="#">构建高可用的 Agent Sandbox 调度系统</a></h3>
+            <p class="post-excerpt">基于 Kubernetes 的沙箱实例管理，如何实现低延迟的容器启动与资源隔离...</p>
+        </div>
+
+        <div class="post-preview">
+            <div class="post-date">2026年3月10日</div>
+            <h3><a href="#">MCP 协议深度解析：Server 与 Client 的边界</a></h3>
+            <p class="post-excerpt">为什么我们需要 MCP？谈谈在不同 AI 运行环境下标准化工具调用的必要性...</p>
+        </div>
+    </section>
+
+    <script>
+        // 简单的切换逻辑
+        function showSection(sectionId) {
+            // 隐藏所有 section
+            document.querySelectorAll('section').forEach(sec => {
+                sec.classList.remove('active');
+            });
+            // 显示选中的 section
+            document.getElementById(sectionId).classList.add('active');
+        }
+    </script>
+
+</body>
 </html>
