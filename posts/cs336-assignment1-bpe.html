@@ -11,6 +11,7 @@
             --text-color: #333;
             --bg-color: #fff;
             --border-color: #eee;
+            --code-bg: #f8f9fa;
         }
 
         body {
@@ -61,6 +62,7 @@
         .post-header h1 {
             color: var(--primary-blue);
             margin: 0 0 10px 0;
+            line-height: 1.3;
         }
 
         .post-date {
@@ -68,47 +70,62 @@
             font-size: 0.9em;
         }
 
-        .post-content {
-            margin-top: 30px;
-        }
-
         .post-content h2 {
             color: var(--primary-blue);
-            margin-top: 30px;
+            margin-top: 40px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 5px;
+        }
+        
+        .post-content h3 {
+            color: #444;
+            margin-top: 25px;
         }
 
         .post-content p {
             margin: 15px 0;
         }
 
-        .placeholder {
+        .post-content ul, .post-content ol {
+            margin-bottom: 20px;
+            padding-left: 20px;
+        }
+
+        .highlight-box {
             background-color: var(--light-blue);
             border-left: 4px solid var(--primary-blue);
-            padding: 20px;
+            padding: 15px 20px;
             margin: 20px 0;
-            color: #666;
+            color: #333;
+            font-size: 0.95em;
         }
 
         code {
-            background-color: #f4f4f4;
+            background-color: var(--code-bg);
             padding: 2px 6px;
             border-radius: 3px;
             font-family: "Consolas", "Monaco", monospace;
             font-size: 0.9em;
+            color: #d14;
         }
 
         pre {
-            background-color: #f4f4f4;
             padding: 15px;
             overflow-x: auto;
             border-radius: 5px;
+            border: 1px solid #ddd;
+            line-height: 1.4;
         }
 
         pre code {
             background: none;
             padding: 0;
+            font-size: 0.85em;
         }
     </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
 </head>
 <body>
 
@@ -126,29 +143,329 @@
         </div>
 
         <div class="post-content">
-            <div class="placeholder">
-                <p><strong>[占位内容]</strong> 这篇笔记正在撰写中，敬请期待...</p>
-            </div>
 
             <h2>背景</h2>
             <p>
-                <a href="https://stanford-cs336.github.io/spring2025/" target="_blank">Stanford CS336</a> 是 Stanford 开设的一门关于大语言模型（LLM）的课程，涵盖了从预训练到后训练的完整 pipeline。这是该课程的第一个 assignment，目标是实现一个 Byte Pair Encoding (BPE) 分词器。
+                <a href="https://stanford-cs336.github.io/spring2025/" target="_blank">Stanford CS336</a> 是 Stanford 开设的一门关于大语言模型（LLM）的课程，涵盖了从预训练到后训练的完整 pipeline。这是该课程的第一个 assignment，目标是手动实现一个健壮且高效的 Byte Pair Encoding (BPE) 分词器。在这篇文章中，我将梳理 BPE 的底层逻辑以及我在实现过程中踩到的工程坑。
             </p>
 
-            <h2>Byte Pair Encoding 简介</h2>
-            <p>
-                BPE 是一种常见的子词（subword）分词算法，广泛应用于现代 NLP 系统中。其核心思想是从字符级别开始，迭代地将语料中最频繁相邻的 token 对合并成新的 token，直到达到预定的词汇表大小。
-            </p>
+            <h2>前置知识：底层数据表示</h2>
+            
+            <h3>1. Unicode 标准与 UTF-8 编码</h3>
+            <p>一切文本处理的起点都是字符编码。<strong>Unicode</strong> 本质上是一个巨大的“映射字典”，它给世界上几乎所有现代字符分配了一个唯一的数字（比如 1~15w 的范围）。</p>
+            <p>而 <strong>UTF-8</strong> 则是将这些 Unicode 字符编码为计算机可读的字节流的具体方式。这是一种变长编码，有的字符用 1 个字节，有的需要 2 到 4 个字节：</p>
+            <ul>
+                <li><code>'h'</code>：对应 Unicode 104，UTF-8 编码为单字节：<code>01101000</code> (0x68)。</li>
+                <li><code>'こ'</code>：对应 Unicode 12371，UTF-8 编码为 3 个字节：<code>0xE3 0x81 0x93</code>。</li>
+                <li><code>'你'.encode("utf-8")</code>：结果为 <code>b'\xe4\xbd\xa0'</code>。</li>
+            </ul>
 
-            <h2>实现要点</h2>
+            <div class="highlight-box">
+                <strong>踩坑点：</strong>在作业的 <code>decode_utf8_bytes_to_str_wrong</code> 函数中一定会失败。因为如果你试图将 UTF-8 字节流中的每一个字节单独拿去 <code>decode</code>，遇到像 <code>\xe3</code> 这样的字节就会报错。它只是一个多字节字符（如日文或中文）的起始标识，本身并不代表一个完整的字符。
+            </div>
+
+            <h3>2. 为什么不用纯 Byte-level Tokenization？</h3>
+            <p>既然所有文本都能转成字节，为什么不直接把字节丢给模型训练？如果基于 UTF-8 的字节序列直接训练，那么原本 10 个英文单词，转换为字节后可能变成 30 个字节。这会导致<strong>序列长度（Sequence Length）暴增</strong>，极大地影响 Transformer 模型的训练和推理效率（Attention 机制的计算复杂度是序列长度的平方）。因此，我们需要引入子词分词。</p>
+
+            <h2>Byte Pair Encoding (BPE) 算法核心</h2>
+            
+            <h3>1. BPE 的诞生与思路</h3>
+            <p>2016 年，Sennrich 将数据压缩领域的 BPE 算法引入 NLP 领域。核心思想是：如果 <code>t-h-e</code> 这三个字节经常相邻出现，就把它们合并为一个单一的 Token：<code>the</code>。通过这种自底向上不断合并高频组合的方式，能在“防止序列过长”和“控制词表大小”之间找到完美平衡。</p>
+
+            <h3>2. Pre-Tokenization（预分词）</h3>
+            <p>如果不加限制地直接在整个语料上做 BPE 合并，很可能会出现 <code>"dog!"</code> 和 <code>"dog."</code> 这样语义相同却占据不同 Token ID 的情况。为了避免跨单词或跨标点符号的非法合并，在正式 BPE 之前，需要先进行一次粗粒度的分词，将文本切分为独立的词元（chunks）。</p>
+
+            <h3>3. 合并规则与“字典序”</h3>
+            <p>BPE 的核心流程就是：将词元转化为 UTF-8 编码 -> 统计相邻 Pair 频次 -> 选出最高频合并 -> 更新词表。这里有一个关键的边界规则：<strong>当有多个 Pair 频次一致时，按字典序（Lexicographical order）更大的优先合并。</strong></p>
+            <p>所谓字典序，就是按字符在 ASCII 码表中的大小逐位比较。比如数字 < 大写字母 < 小写字母。在 Python 中，直接对比 <code>bytes</code> 类型（例如 <code>b'a' &gt; b'b'</code>）原生就是严格的字典序比较，这在维护优先队列（大顶堆）时非常方便。</p>
+
+            <h2>代码实现与架构优化</h2>
+            <p>手动实现一个处理千万级语料的 BPE 分词器，如果不做架构优化，跑几天都跑不完。以下是我在实现过程中的核心模块拆解。</p>
+
+            <h3>模块一：大顶堆与字典序 Tie-breaker</h3>
+            <p>为了在 $O(\log N)$ 时间内找到最高频的 Byte Pair，我们需要维护一个大顶堆。由于 Python 内置的 <code>heapq</code> 是小顶堆，且我们需要在频次相同时按“字典序降序”破局，因此需要重写 <code>__lt__</code> 魔术方法。</p>
+<pre><code class="language-python">import heapq
+from typing import Tuple, Optional, List
+
+class _HeapItem:
+    """
+    堆元素包装器，实现以下排序逻辑：
+    1. count降序 (通过存负数实现小顶堆模拟大顶堆)
+    2. pair字典序降序
+    """
+    __slots__ = ['neg_count', 'pair', 'count']
+
+    def __init__(self, pair: Tuple[bytes, bytes], count: int):
+        self.pair = pair
+        self.count = count
+        self.neg_count = -count
+    
+    def __lt__(self, other: '_HeapItem') -&gt; bool:
+        if self.neg_count != other.neg_count:
+            return self.neg_count &lt; other.neg_count
+        # 当频次相同时，字典序更大的排在前面（因为是模拟大顶堆）
+        return self.pair &gt; other.pair
+
+class BytePairMaxHeap:
+    __slots__ = ['_heap']
+
+    def __init__(self):
+        self._heap: List[_HeapItem] = []
+
+    def push(self, pair: Tuple[bytes, bytes], count: int) -&gt; None:
+        heapq.heappush(self._heap, _HeapItem(pair, count))
+
+    def pop_most_frequent(self) -&gt; Optional[Tuple[Tuple[bytes, bytes], int]]:
+        if not self._heap:
+            return None
+        item = heapq.heappop(self._heap)
+        return item.pair, item.count
+
+class BPEVocab(BytePairMaxHeap):
+    def __init__(self):
+        super().__init__()
+        # 外层构造dict类型，用于懒惰删除（Lazy Deletion）验证最新频次
+        self.valid_counts = {}
+    
+    def push(self, pair, count):
+        self.valid_counts[pair] = count
+        super().push(pair, count)
+    
+    def pop_most_frequent_valid(self):
+        while self._heap:
+            pair, count = super().pop_most_frequent()
+            if self.valid_counts.get(pair, 0) == count:
+                return pair, count
+        return None
+
+    def add_count(self, pair, count):
+        """基于某个pair增加或减少count"""
+        old_count = self.valid_counts.get(pair, 0)
+        new_count = old_count + count
+        self.push(pair, new_count)</code></pre>
+
+            <h3>模块二：安全的文件切块与预分词</h3>
+            <p>处理 GB 级别的大文件时，不能一次性读入内存。我们需要将文件切分（Chunking）。这里的坑在于：不能暴力切分字节，否则会把形如 <code>&lt;|endoftext|&gt;</code> 的特殊标记拦腰截断。我们需要一个安全的寻址函数。</p>
+<pre><code class="language-python">from typing import BinaryIO
+import os
+
+def find_chunk_boundaries(
+    file: BinaryIO,
+    desired_num_chunks: int,
+    split_special_token: bytes,
+) -&gt; list[int]:
+    """
+    将文件安全地切分成可以独立统计的块，确保不在 Special Token 内部断开。
+    """
+    assert isinstance(split_special_token, bytes)
+    file.seek(0, os.SEEK_END)
+    file_size = file.tell()
+    file.seek(0)
+
+    chunk_size = file_size // desired_num_chunks
+    chunk_boundaries = [i * chunk_size for i in range(desired_num_chunks + 1)]
+    chunk_boundaries[-1] = file_size
+    mini_chunk_size = 4096 
+
+    for bi in range(1, len(chunk_boundaries) - 1):
+        initial_position = chunk_boundaries[bi]
+        file.seek(initial_position)
+        while True:
+            mini_chunk = file.read(mini_chunk_size)
+            if mini_chunk == b"":
+                chunk_boundaries[bi] = file_size
+                break
+            
+            # 寻找换行或特殊的 Token 作为安全边界
+            found_at = mini_chunk.find(split_special_token)
+            if found_at != -1:
+                chunk_boundaries[bi] = initial_position + found_at
+                break
+            initial_position += mini_chunk_size
+
+    return sorted(set(chunk_boundaries))</code></pre>
+
+            <h3>模块三：状态初始化（从 Pair 到 Symbol 的架构升级）</h3>
+            <p>一开始，我维护的是“字节对（Pair）”构成的列表，结果在更新时要疯狂处理左边界、右边界和重叠合并（如 <code>e e e</code>）的问题，代码极其臃肿且容易越界。</p>
+            <p>后来我重构了数据结构：直接维护每个单词当前的 <strong>词元（Symbol）列表</strong>，并将倒排索引改用 <code>set</code>，让增删查的时间复杂度直接降到 $O(1)$。</p>
+<pre><code class="language-python">from collections import defaultdict
+import regex as re
+
+class BPETrainer:
+    # ... 省略 __init__ 及 pre_tokenization 相关代码 ...
+
+    def _inital_states(self):
+        """
+        构建基于“词元(Symbol)”状态的记忆列表与倒排索引
+        """
+        # 核心结构改动：存储每个词的频率与它当前的 Symbol 序列
+        # 格式: [{"count": int, "symbols": List[bytes]}]
+        self.word_states = [] 
+        
+        # 使用 set 替代 list，保证倒排索引的增删是 O(1) 操作
+        self.pair_to_word_indices = defaultdict(set) 
+        
+        for word, count in self.words_counting.items():
+            word_encoding = word.encode("utf-8")
+            # 初始化时，每个 byte 就是一个独立的 symbol
+            symbols = [word_encoding[i:i+1] for i in range(len(word_encoding))]
+            
+            word_idx = len(self.word_states)
+            self.word_states.append({"count": count, "symbols": symbols})
+            
+            if len(symbols) &lt; 2:
+                continue
+                
+            # 统计初始 pairs
+            for i in range(len(symbols) - 1):
+                pair = (symbols[i], symbols[i+1])
+                self.bytepair_counting_dict.add_count(pair, count)
+                self.pair_to_word_indices[pair].add(word_idx)</code></pre>
+
+            <h3>模块四：基于差异（Delta）的高效状态更新</h3>
+            <p>在核心的 <code>merge</code> 循环中，由于我们维护了 Symbol 序列，我们不再需要繁琐地去推导“左右邻居变成了什么”。我们采用<strong>“快照比对”</strong>策略：截取合并前的 Pairs 快照，生成新的 Symbol 序列后，再截取新的 Pairs 快照。两者做差集，即可得出哪些频次需要增加，哪些需要扣除。这彻底规避了连续字符重叠合并的 Bug。</p>
+<pre><code class="language-python">    def merge_and_update_bytepair(self, most_frequent_pair: Tuple[bytes, bytes]):
+        """基于 Symbol 序列的差异化更新逻辑"""
+        new_token = most_frequent_pair[0] + most_frequent_pair[1]
+        
+        # 1. 获取所有包含该 pair 的单词索引 (套一层list防止迭代中修改set报错)
+        word_indices = list(self.pair_to_word_indices.get(most_frequent_pair, set()))
+        
+        # 2. 全局状态更新
+        self.vocab[len(self.vocab)] = new_token
+        self.bytepair_counting_dict.push(most_frequent_pair, 0)
+        if most_frequent_pair in self.pair_to_word_indices:
+            del self.pair_to_word_indices[most_frequent_pair]
+
+        # 3. 遍历并更新每个受影响的单词
+        for word_idx in word_indices:
+            state = self.word_states[word_idx]
+            symbols = state["symbols"]
+            count = state["count"]
+
+            # --- 第一步：对当前状态建立“快照” ---
+            old_pairs = [(symbols[i], symbols[i+1]) for i in range(len(symbols) - 1)]
+            unique_old_pairs = set(old_pairs)
+
+            # --- 第二步：生成新的 Symbol 序列 ---
+            new_symbols = []
+            i = 0
+            while i &lt; len(symbols):
+                # 贪婪匹配目标 pair
+                if i &lt; len(symbols) - 1 and (symbols[i], symbols[i+1]) == most_frequent_pair:
+                    new_symbols.append(new_token)
+                    i += 2  # 成功合并，跳过两个旧的 symbol
+                else:
+                    new_symbols.append(symbols[i])
+                    i += 1  # 未匹配，保留旧 symbol 并步进
+            
+            # --- 第三步：对新状态建立“快照” ---
+            new_pairs = [(new_symbols[i], new_symbols[i+1]) for i in range(len(new_symbols) - 1)]
+            unique_new_pairs = set(new_pairs)
+
+            # --- 第四步：计算差异（Delta）并同步到全局计数与索引 ---
+            for p in old_pairs:
+                self.bytepair_counting_dict.add_count(p, -count)
+            for p in new_pairs:
+                self.bytepair_counting_dict.add_count(p, count)
+
+            # 索引增删：利用 Set 的差集
+            pairs_to_remove = unique_old_pairs - unique_new_pairs
+            pairs_to_add = unique_new_pairs - unique_old_pairs
+            
+            for p in pairs_to_remove:
+                if p in self.pair_to_word_indices:
+                    self.pair_to_word_indices[p].discard(word_idx)
+            
+            for p in pairs_to_add:
+                self.pair_to_word_indices[p].add(word_idx)
+
+            # --- 第五步：保存更新 ---
+            state["symbols"] = new_symbols</code></pre>
+
+            <h3>模块五：训练主循环</h3>
+            <p>最后，将上述所有模块拼装在一起，我们得到了一个非常清爽的主循环。</p>
+<pre><code class="language-python">    def train_bpe(self):
+        """训练bpe流程"""
+        # 第一步：预分词与初始统计
+        self._init_words_counting()
+        self._inital_states()
+        
+        # 第二步：迭代合并，直到满足词表大小
+        iter_time = 0
+        while len(self.vocab) &lt; self.vocab_size:
+            iter_time += 1
+            # 找到最frequent的bytepair
+            most_frequent_pair, max_count = self.bytepair_counting_dict.pop_most_frequent_valid()
+            if not most_frequent_pair:
+                break
+                
+            self.merges.append(most_frequent_pair)
+            # 增量完成合并
+            self.merge_and_update_bytepair(most_frequent_pair)
+
+if __name__ == "__main__":
+    import time
+    start_time = time.time()
+    vocab_size = 1000
+    obj = BPETrainer(
+        input_path="tests/fixtures/tinystories_sample_5M.txt", 
+        vocab_size=vocab_size, 
+        special_tokens=["&lt;|endoftext|&gt;"]
+    )
+    obj.train_bpe()
+    print(f"目标词表大小：{vocab_size}, 耗时{time.time() - start_time}秒")</code></pre>
+
+            <h2>性能剖析</h2>
             <p>
-                [待补充：具体的实现细节与代码解析]
+                实现完成后，我使用 Python 内置的 <code>cProfile</code> 对 BPE 训练流程进行了性能剖析，以定位真正的瓶颈所在。运行命令如下：
             </p>
+<pre><code class="language-bash">python -m cProfile -s tottime cprofile.py</code></pre>
+            <p>
+                测试条件：目标词表大小 <code>vocab_size = 1000</code>，输入文件为 5MB 的 TinyStories 采样文本。结果如下：
+            </p>
+<pre><code>==================================================
+性能分析结果：
+==================================================
+         4128203 function calls in 107.905 seconds
+
+   Ordered by: internal time
+   List reduced from 23 to 20 due to restriction &lt;20&gt;
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        1   86.754   86.754   86.754   86.754 training_startups.py:273(_init_words_counting)
+        1   20.227   20.227   21.070   21.070 training_startups.py:287(_inital_states)
+   400576    0.153    0.000    0.574    0.000 training_startups.py:79(push)
+   400576    0.153    0.000    0.421    0.000 training_startups.py:48(push)
+   400576    0.143    0.000    0.217    0.000 {built-in method _heapq.heappush}
+   399833    0.142    0.000    0.766    0.000 training_startups.py:90(add_count)
+   377032    0.083    0.000    0.083    0.000 {method 'add' of 'set' objects}
+   937259    0.076    0.000    0.076    0.000 training_startups.py:27(__lt__)
+   400576    0.051    0.000    0.051    0.000 training_startups.py:22(__init__)
+   400576    0.051    0.000    0.051    0.000 {method 'get' of 'dict' objects}
+      743    0.021    0.000    0.072    0.000 training_startups.py:210(merge_and_update_bytepair)
+   273269    0.021    0.000    0.021    0.000 {built-in method builtins.len}
+    59921    0.011    0.000    0.011    0.000 {method 'encode' of 'str' objects}
+    73941    0.011    0.000    0.011    0.000 {method 'append' of 'list' objects}
+        1    0.002    0.002  107.903  107.903 training_startups.py:316(train_bpe)
+      743    0.002    0.000    0.004    0.000 {built-in method _heapq.heappop}
+        1    0.001    0.001    0.001    0.001 {method 'disable' of '_lsprof.Profiler' objects}
+      743    0.001    0.000    0.005    0.000 training_startups.py:54(pop_most_frequent)
+     1831    0.001    0.000    0.001    0.000 {method 'discard' of 'set' objects}
+        1    0.000    0.000    0.001    0.001 contextlib.py:141(__exit__)</code></pre>
+            <p>从数据中可以得出几个关键结论：</p>
+            <ul>
+                <li><strong>绝对瓶颈：</strong><code>_init_words_counting</code> 单函数独占 86.75 秒（80.4%），瓶颈在于正则分词和大文件的 I/O 读取。这几乎是不可绕过的"体力活"，后续可考虑用多进程并行切分来加速。</li>
+                <li><strong>堆操作开销可观：</strong><code>push</code> 和 <code>add_count</code> 合计被调用约 80 万次，<code>__lt__</code> 比较被调用 93.7 万次。说明 BPE 每轮合并后对倒排索引和堆的增量更新非常高频，<code>valid_counts</code> 字典的 get/set 也是隐藏的热点。</li>
+                <li><strong>合并循环本身很快：</strong>总共只执行了 743 次合并迭代（vocab_size=1000 减去初始 256 个字节 token），<code>merge_and_update_bytepair</code> 单次平均仅 0.097ms，说明基于 Symbol 快照的增量更新策略非常高效。</li>
+                <li><strong>总耗时约 108 秒：</strong>对于一个 5MB 语料、1000 词表的 BPE 训练来说，Python 单线程跑到这个量级已经是合理水平。如果要扩展到 GB 级语料和 5 万+ 词表，初始化阶段必须引入并行化。</li>
+            </ul>
 
             <h2>总结</h2>
             <p>
-                [待补充：总结与思考]
+                手写 BPE 的过程，实际上是一次对数据结构和计算机底层编码的重新审视。它不仅考验对算法理论的理解，更暴露了许多 Python 工程实践上的细节：从大文件的 I/O Chunking，到哈希表 $O(1)$ 复杂度的倒排索引设计，再到避免列表 $O(N)$ 删除操作的集合论应用。越是底层的基建代码，越需要打磨“优雅”。
             </p>
+
         </div>
     </article>
 
